@@ -528,19 +528,32 @@ def parse_risk_level(response_text: str) -> str:
 # STT / TTS
 # ══════════════════════════════════════════════════════════════════════════════
 
-def transcribe_audio(audio_bytes: bytes) -> str:
+def transcribe_audio(audio_bytes: bytes, filename: str = "audio.webm") -> str:
+    """
+    Transcribes speech audio using Groq Whisper-large-v3.
+
+    IMPORTANT: Do NOT set language='hi' here.
+    Forcing a language causes Whisper to hallucinate or incorrectly transcribe
+    when the user speaks English. Leaving it unset enables true multilingual
+    auto-detection — it correctly handles Hindi, Hinglish, and English in the
+    same session without any configuration changes.
+    """
     if not state.groq_client: return "Server busy."
     try:
         transcription = state.groq_client.audio.transcriptions.create(
-            file=("audio.webm", audio_bytes),
+            file=(filename, audio_bytes),
             model=WHISPER_MODEL,
             response_format="text",
-            language="hi",
+            # language is intentionally omitted → Whisper auto-detects
+            # Supports Hindi, Hinglish (romanised) and English seamlessly
         )
-        return transcription.strip()
+        transcribed = transcription.strip() if isinstance(transcription, str) else str(transcription).strip()
+        log.info(f"🎙️ Whisper transcribed: '{transcribed}'")
+        return transcribed
     except Exception as e:
         log.error(f"❌ Whisper error: {e}")
-        return "Audio samajh nahi aaya."
+        return "Audio samajh nahi aaya, please type your question."
+
 
 _EMOJI_RE = re.compile(r"[\U0001F300-\U0001F9FF\U00002600-\U000027BF\U0000FE00-\U0000FE0F✅❌⚠️❓🏋️🎙️]+", flags=re.UNICODE)
 
@@ -683,7 +696,15 @@ def run_text_pipeline(query: str, chat_id: int) -> dict:
 @app.post("/verify")
 async def verify(chat_id: int = Query(...), audio: UploadFile = File(...)):
     audio_bytes = await audio.read()
-    user_query = transcribe_audio(audio_bytes)
+
+    # Guard: reject suspiciously small blobs (< 1 KB usually means empty / mic error)
+    if len(audio_bytes) < 1024:
+        raise HTTPException(status_code=400, detail="Audio recording too short or empty. Please try again.")
+
+    # Pass the real filename so Whisper can identify the codec (webm / mp4 / ogg)
+    filename = audio.filename or "recording.webm"
+    user_query = transcribe_audio(audio_bytes, filename=filename)
+
     result = run_text_pipeline(user_query, chat_id)
     tts_lang = "hi" if result["language"] == "hindi" else "en"
     tts_bytes = generate_tts(result["ai_response"], language=tts_lang)

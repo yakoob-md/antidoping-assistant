@@ -16,6 +16,7 @@ export default defineConfig({
       '/history': 'http://localhost:8000',
       '/health': 'http://localhost:8000',
       '/chats': 'http://localhost:8000',
+      '/api': 'http://localhost:8000',   // TTS narration: /api/tts
     }
   }
 })

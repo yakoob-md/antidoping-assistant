@@ -119,7 +119,12 @@ export const useChat = () => {
 
     setIsLoading(true);
     const formData = new FormData();
-    formData.append('audio', audioBlob, 'recording.webm');
+    // Derive correct file extension from the blob's MIME type so Whisper can parse the format
+    const mimeType = audioBlob.type || 'audio/webm';
+    const ext = mimeType.includes('mp4') ? 'mp4'
+              : mimeType.includes('ogg') ? 'ogg'
+              : 'webm';
+    formData.append('audio', audioBlob, `recording.${ext}`);
 
     try {
       const res = await fetch(`/verify?chat_id=${targetChatId}`, {

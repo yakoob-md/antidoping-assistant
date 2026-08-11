@@ -161,35 +161,35 @@ Button.displayName = "Button";
 // VoiceRecorder Component
 interface VoiceRecorderProps {
   isRecording: boolean;
-  onStartRecording: () => void;
-  onStopRecording: (duration: number) => void;
   visualizerBars?: number;
 }
 const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   isRecording,
-  onStartRecording,
-  onStopRecording,
   visualizerBars = 32,
 }) => {
   const [time, setTime] = React.useState(0);
   const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── Timer: only manages the seconds counter, nothing else ─────────────────
   React.useEffect(() => {
     if (isRecording) {
-      onStartRecording();
+      // Reset and start the clock
+      setTime(0);
       timerRef.current = setInterval(() => setTime((t) => t + 1), 1000);
     } else {
+      // Stop the clock when recording ends
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
-      onStopRecording(time);
       setTime(0);
     }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isRecording, time, onStartRecording, onStopRecording]);
+    // ⚠️ `time` is intentionally excluded — we only react to isRecording changing
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRecording]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -224,6 +224,7 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     </div>
   );
 };
+
 
 // ImageViewDialog Component
 interface ImageViewDialogProps {
@@ -621,10 +622,9 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
         {isRecording && (
           <VoiceRecorder
             isRecording={isRecording}
-            onStartRecording={onStartRecording}
-            onStopRecording={onStopRecording}
           />
         )}
+
 
         <PromptInputActions className="flex items-center justify-between gap-2 p-0 pt-2">
           <div
